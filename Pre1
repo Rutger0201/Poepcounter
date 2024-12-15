@@ -1,0 +1,115 @@
+import random
+import pandas as pd
+import streamlit as st
+import matplotlib.pyplot as plt
+
+# Function to calculate money earned per second
+def calculate_money_earned(hourly_wage, duration_seconds):
+    euros_per_second = hourly_wage / 3600
+    return duration_seconds * euros_per_second
+
+# Function to simulate toilet breaks with random durations
+def simulate_toilet_breaks(hourly_wage, num_breaks, min_duration, max_duration):
+    total_money_earned = 0
+    earnings_over_time = []
+    total_time_spent = 0
+    cumulative_time = []
+    log = []
+
+    for break_num in range(1, num_breaks + 1):
+        # Randomize break duration within given range
+        duration = random.randint(min_duration, max_duration)
+        money_earned = calculate_money_earned(hourly_wage, duration)
+        total_money_earned += money_earned
+        total_time_spent += duration
+        earnings_over_time.append(total_money_earned)
+        cumulative_time.append(round(total_time_spent / 60, 2))
+
+        log.append({
+            "Break Number": break_num,
+            "Time Spent (minutes)": round(total_time_spent / 60, 2),
+            "Duration (seconds)": duration,
+            "Money Earned (€)": round(money_earned, 2),
+            "Total Earned (€)": round(total_money_earned, 2)
+        })
+
+    return total_money_earned, earnings_over_time, cumulative_time, log
+
+# Function to plot earnings over time
+def plot_earnings(cumulative_time, earnings_over_time, profile_name, color):
+    plt.figure(figsize=(8, 5))
+    plt.plot(cumulative_time, earnings_over_time, marker='o', color=color, label=profile_name)
+    plt.title('Earnings During Toilet Breaks')
+    plt.xlabel('Time Spent on Toilet (minutes)')
+    plt.ylabel('Total Money Earned (€)')
+    plt.grid(True)
+    plt.legend()
+    st.pyplot(plt)
+
+# Streamlit App
+def main():
+    st.title("Toilet Break Earnings Simulator")
+
+    # User input for profiles
+    st.sidebar.header("Profile Settings")
+    profiles = {
+        "Rutger": {
+            "age": st.sidebar.slider("Rutger's Age", 18, 70, 25),
+            "hourly_wage": st.sidebar.slider("Rutger's Hourly Wage (€)", 10, 50, 20),
+            "num_breaks": st.sidebar.slider("Rutger's Number of Breaks", 5, 20, 12),
+            "min_duration": st.sidebar.slider("Rutger's Min Break Duration (seconds)", 30, 300, 120),
+            "max_duration": st.sidebar.slider("Rutger's Max Break Duration (seconds)", 300, 900, 600),
+            "color": "blue"
+        },
+        "Jarno": {
+            "age": st.sidebar.slider("Jarno's Age", 18, 70, 30),
+            "hourly_wage": st.sidebar.slider("Jarno's Hourly Wage (€)", 10, 50, 22),
+            "num_breaks": st.sidebar.slider("Jarno's Number of Breaks", 5, 20, 8),
+            "min_duration": st.sidebar.slider("Jarno's Min Break Duration (seconds)", 30, 300, 120),
+            "max_duration": st.sidebar.slider("Jarno's Max Break Duration (seconds)", 300, 900, 500),
+            "color": "green"
+        },
+        "Renate": {
+            "age": st.sidebar.slider("Renate's Age", 18, 70, 28),
+            "hourly_wage": st.sidebar.slider("Renate's Hourly Wage (€)", 10, 50, 25),
+            "num_breaks": st.sidebar.slider("Renate's Number of Breaks", 5, 20, 5),
+            "min_duration": st.sidebar.slider("Renate's Min Break Duration (seconds)", 30, 300, 60),
+            "max_duration": st.sidebar.slider("Renate's Max Break Duration (seconds)", 300, 900, 300),
+            "color": "red"
+        }
+    }
+
+    # Simulate for each profile
+    all_logs = []
+    for name, settings in profiles.items():
+        st.subheader(f"Simulating for {name} (Age: {settings['age']}, Hourly Wage: €{settings['hourly_wage']})")
+        total_money_earned, earnings_over_time, cumulative_time, log = simulate_toilet_breaks(
+            hourly_wage=settings["hourly_wage"],
+            num_breaks=settings["num_breaks"],
+            min_duration=settings["min_duration"],
+            max_duration=settings["max_duration"]
+        )
+
+        # Display summary statistics
+        st.write(f"**{name} - Total Money Earned:** €{round(total_money_earned, 2)}")
+        st.write(f"**{name} - Total Time Spent on Toilet:** {round(sum(entry['Duration (seconds)'] for entry in log) / 60, 2)} minutes")
+
+        # Display plot
+        plot_earnings(cumulative_time, earnings_over_time, name, settings["color"])
+
+        # Add to logs for exporting
+        all_logs.extend(log)
+
+    # Export log as CSV
+    if st.button("Download Log as CSV"):
+        df = pd.DataFrame(all_logs)
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Log",
+            data=csv,
+            file_name="toilet_break_logs.csv",
+            mime="text/csv"
+        )
+
+if __name__ == "__main__":
+    main()
