@@ -47,13 +47,14 @@
 
   const LABELS = { signature: 'Signature', klassiek: 'Klassieker', fris: 'Fris & fruitig', mocktail: 'Alcoholvrij' };
 
-  // Prijzen voor de calculator (zelfde bedragen als bij Prijzen in index.html)
-  const PAKKETTEN = {
-    classic:   { basis: 295, basisUren: 4, pp: 0,  maxGasten: 40, extraBartenderPer: 60 },
-    signature: { basis: 0,   basisUren: 4, pp: 18, minGasten: 40, extraBartenderPer: 70 },
-    grand:     { basis: 0,   basisUren: 6, pp: 26, minGasten: 80, extraBartenderPer: 60 }
+  // Tarieven (zelfde bedragen als op de prijzenpagina in index.html)
+  const TARIEF = {
+    uur: 45,            // per uur achter de bar
+    voorbereiding: 1,   // altijd 1 uur voorbereiding
+    menu: 75,           // cocktailmenu & gebruik materialen
+    spoed: 0.25,        // toeslag bij boeken binnen 1 maand
+    annuleren: 0.20     // bij annuleren binnen 14 dagen
   };
-  const UURTARIEF = 55, EXTRA_BARTENDER = 45;
 
   /* ================= SVG-glazen ================= */
   function glasSvg(type) {
@@ -88,15 +89,32 @@
     $$('.card', grid).forEach(card => card.classList.toggle('is-hidden', f !== 'alle' && card.dataset.cat !== f));
   }));
 
-  /* ================= Navigatie ================= */
+  /* ================= Navigatie: één pagina tegelijk ================= */
   const nav = $('.nav'), toggle = $('.nav__toggle'), menu = $('#menu'), fab = $('.fab');
-  const opScroll = () => {
-    nav.classList.toggle('is-scrolled', scrollY > 40);
-    const boeken = $('#boeken').getBoundingClientRect();
-    fab.classList.toggle('is-hidden', scrollY < 500 || boeken.top < innerHeight);
-  };
-  addEventListener('scroll', opScroll, { passive: true });
-  opScroll();
+  const pages = $$('.page');
+  let huidige = null;
+
+  function route() {
+    const id = decodeURIComponent(location.hash.slice(1)) || 'home';
+    const doel = document.getElementById(id);
+    const page = (doel && doel.closest('.page')) || $('#home');
+    if (page !== huidige) {
+      pages.forEach(p => { p.hidden = p !== page; });
+      page.classList.remove('page--in'); void page.offsetWidth; page.classList.add('page--in');
+      huidige = page;
+      document.title = page.id === 'home' ? 'Beck on the Rocks · Freelance bartender'
+        : `${$(`#menu a[href="#${page.id}"]`)?.textContent || ''} · Beck on the Rocks`;
+    }
+    $$('#menu a').forEach(a => a.toggleAttribute('aria-current', a.getAttribute('href') === '#' + page.id));
+    nav.classList.toggle('is-solid', page.id !== 'home');
+    fab.classList.toggle('is-hidden', page.id === 'boeken');
+    if (doel && doel !== page) doel.scrollIntoView();
+    else scrollTo(0, 0);
+  }
+  addEventListener('hashchange', route);
+  route();
+
+  addEventListener('scroll', () => nav.classList.toggle('is-scrolled', scrollY > 40), { passive: true });
 
   toggle.addEventListener('click', () => {
     const open = toggle.getAttribute('aria-expanded') !== 'true';
@@ -132,35 +150,43 @@
   $$('[data-count]').forEach(el => io2.observe(el));
 
   /* ================= Prijscalculator ================= */
-  const euro = n => '€ ' + Math.round(n).toLocaleString('nl-NL');
-  const cP = $('#c-pakket'), cG = $('#c-gasten'), cU = $('#c-uren');
+  const euro = n => '€ ' + n.toLocaleString('nl-NL', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const isSpoed = datum => {
+    if (!datum) return false;
+    const grens = new Date(); grens.setHours(0, 0, 0, 0); grens.setMonth(grens.getMonth() + 1);
+    return new Date(datum + 'T00:00') < grens;
+  };
+  const vandaag = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const cU = $('#c-uren'), cD = $('#c-datum');
+  cD.min = vandaag;
+  $('#boek-form [name=datum]').min = vandaag;
+
   function bereken() {
-    const p = PAKKETTEN[cP.value], gasten = +cG.value, uren = +cU.value;
-    $('#c-gasten-out').textContent = gasten;
+    const uren = +cU.value, spoed = isSpoed(cD.value);
     $('#c-uren-out').textContent = uren;
-    const bartenders = Math.max(1, Math.ceil(gasten / p.extraBartenderPer));
-    let totaal = p.basis + p.pp * Math.max(gasten, p.minGasten || 0);
-    totaal += Math.max(0, uren - p.basisUren) * UURTARIEF;
-    totaal += (bartenders - 1) * EXTRA_BARTENDER * uren;
-    if (cP.value === 'classic' && gasten > p.maxGasten) totaal += (gasten - p.maxGasten) * 4;
-    $$('.calc fieldset input:checked').forEach(i => {
-      if (i.id === 'c-bar' && cP.value !== 'classic') return;
-      if (i.id === 'c-proef' && cP.value === 'grand') return;
-      totaal += +i.value;
-    });
-    $('#c-bar').closest('label').style.opacity = cP.value === 'classic' ? 1 : .4;
+    const regels = [
+      [`${uren} uur bartender × ${euro(TARIEF.uur)}`, uren * TARIEF.uur],
+      [`Voorbereiding (${TARIEF.voorbereiding} uur)`, TARIEF.voorbereiding * TARIEF.uur],
+      ['Cocktailmenu & materialen', TARIEF.menu]
+    ];
+    const basis = regels.reduce((t, r) => t + r[1], 0);
+    if (spoed) regels.push([`Spoedtoeslag (+${TARIEF.spoed * 100}%)`, basis * TARIEF.spoed]);
+    const totaal = regels.reduce((t, r) => t + r[1], 0);
+    $('#c-lines').innerHTML = regels.map(([l, b]) => `<li${l.startsWith('Spoed') ? ' class="is-spoed"' : ''}><span>${l}</span><b>${euro(b)}</b></li>`).join('');
     $('#c-totaal').textContent = euro(totaal);
-    $('#c-detail').textContent = `${bartenders} ${bartenders === 1 ? 'bartender' : 'bartenders'} · ${uren} uur · excl. btw en reiskosten`;
+    $('#c-detail').textContent = spoed
+      ? 'Spoedboeking: je feest is binnen een maand.'
+      : cD.value ? 'Normaal tarief: meer dan een maand vooruit geboekt.' : 'Vul een datum in om te zien of er spoedtoeslag geldt.';
   }
-  $$('.calc input, .calc select').forEach(el => el.addEventListener('input', bereken));
+  [cU, cD].forEach(el => el.addEventListener('input', bereken));
   bereken();
 
   $('#c-cta').addEventListener('click', () => {
-    $('#f-pakket').value = cP.value;
-    $('#boek-form [name=gasten]').value = cG.value;
-    $('#boek-form [name=bericht]').value = `Ongeveer ${cU.value} uur. Indicatie uit de calculator: ${$('#c-totaal').textContent}.`;
+    const f = $('#boek-form');
+    f.elements.uren.value = cU.value;
+    if (cD.value) f.elements.datum.value = cD.value;
+    f.elements.datum.dispatchEvent(new Event('input'));
   });
-  $$('[data-pakket]').forEach(a => a.addEventListener('click', () => { $('#f-pakket').value = a.dataset.pakket; }));
 
   /* ================= Reviews-slider ================= */
   const track = $('#reviews-track'), dots = $('#rev-dots');
@@ -209,6 +235,8 @@
   /* ================= Boekingsformulier ================= */
   // Opent een kant-en-klare mail. Later te vervangen door bijv. Formspree of Netlify Forms.
   const MAIL = 'info@beckontherocks.nl';
+  const fDatum = $('#boek-form [name=datum]');
+  fDatum.addEventListener('input', () => { $('#form-spoed').hidden = !isSpoed(fDatum.value); });
   $('#boek-form').addEventListener('submit', e => {
     e.preventDefault();
     const form = e.target;
@@ -222,8 +250,8 @@
     if (!ok) { note.textContent = 'Vul je naam, een geldig e-mailadres en de datum in.'; return; }
     const d = Object.fromEntries(new FormData(form));
     const body = [
-      `Naam: ${d.naam}`, `E-mail: ${d.email}`, `Datum: ${d.datum}`, `Gasten: ${d.gasten || '-'}`,
-      `Soort event: ${d.soort}`, `Pakket: ${d.pakket || 'nog niet bekend'}`, '', d.bericht || ''
+      `Naam: ${d.naam}`, `E-mail: ${d.email}`, `Datum: ${d.datum}`, `Aantal uur: ${d.uren || '-'}`,
+      `Gasten: ${d.gasten || '-'}`, `Soort feest: ${d.soort}`, isSpoed(d.datum) ? 'Spoedboeking (binnen 1 maand)' : '', '', d.bericht || ''
     ].join('\n');
     location.href = `mailto:${MAIL}?subject=${encodeURIComponent('Aanvraag ' + d.soort + ' op ' + d.datum)}&body=${encodeURIComponent(body)}`;
     note.textContent = 'Dank je! Je mailprogramma opent nu met je aanvraag.';
