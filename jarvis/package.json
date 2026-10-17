@@ -1,0 +1,16 @@
+{
+  "name": "jarvis-demix",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jarvis: de collega-app van DeMIX (checklists, TD, uren, handboek-assistent)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  }
+}

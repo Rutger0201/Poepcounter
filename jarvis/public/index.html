@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis voor DeMIX</title>
+<meta name="description" content="Jarvis: de collega-app van DeMIX voor checklists, TD-meldingen, uren en het personeelshandboek.">
+<meta name="theme-color" content="#0f1a14">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Naar de inhoud</a>
+
+<!-- ============ Inloggen (live) ============ -->
+<section class="screen centered" id="scr-login" hidden>
+  <div class="login-box">
+    <div class="logo" aria-hidden="true">J</div>
+    <h1 class="h-xl">Jarvis</h1>
+    <p class="muted">De collega-app van DeMIX</p>
+    <form id="login-email" class="stack" novalidate>
+      <label class="fld"><span>Je e-mailadres van DeMIX</span><input id="li-email" type="email" autocomplete="email" inputmode="email" required></label>
+      <p class="err" id="li-err" role="alert" hidden></p>
+      <button class="btn primary" id="li-stuur" type="submit">Stuur me een inlogcode</button>
+    </form>
+    <form id="login-code" class="stack" novalidate hidden>
+      <p>We hebben een code gestuurd naar <b id="li-naar"></b>.</p>
+      <label class="fld"><span>Code uit de mail</span><input id="li-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required></label>
+      <p class="err" id="li-err2" role="alert" hidden></p>
+      <button class="btn primary" id="li-check" type="submit">Inloggen</button>
+      <button class="btn link" id="li-opnieuw" type="button">Ander e-mailadres</button>
+    </form>
+    <form id="login-tablet" class="stack" novalidate hidden>
+      <h2 class="h-m">Balie-tablet koppelen</h2>
+      <p class="small muted">Alleen voor de clubmanager: log in met het tablet-account van de vestiging. Daarna loggen collega's in met hun PIN.</p>
+      <label class="fld"><span>E-mailadres tablet</span><input id="lt-email" type="email" autocomplete="username"></label>
+      <label class="fld"><span>Wachtwoord</span><input id="lt-ww" type="password" autocomplete="current-password"></label>
+      <p class="err" id="lt-err" role="alert" hidden></p>
+      <button class="btn primary" id="lt-go" type="submit">Tablet koppelen</button>
+      <button class="btn link" id="lt-terug" type="button">Terug</button>
+    </form>
+    <button class="btn link small" id="li-tablet" type="button">Dit is de balie-tablet</button>
+  </div>
+</section>
+
+<!-- ============ Demo ============ -->
+<section class="screen" id="scr-demo" hidden>
+  <div class="wrap">
+    <div class="demo-kop">
+      <div class="logo" aria-hidden="true">J</div>
+      <div><h1 class="h-l">Jarvis demo</h1><p class="muted small">Kies wie je bent. Alles blijft in deze browser.</p></div>
+    </div>
+    <div id="demo-lijst"></div>
+    <h3 class="h-m spaced">Balie-tablet</h3>
+    <p class="small muted">Op de tablet log je in met je PIN. In de demo is dat voor iedereen <b>2580</b>.</p>
+    <div class="namen" id="demo-tablets"></div>
+    <button class="btn link small spaced" id="demo-reset" type="button">Demo opnieuw beginnen</button>
+  </div>
+</section>
+
+<!-- ============ Balie-tablet ============ -->
+<section class="screen" id="scr-tablet" hidden>
+  <div class="wrap">
+    <header class="tab-kop">
+      <div><h1 class="h-l">Wie ben jij?</h1><p class="muted" id="tab-sub"></p></div>
+      <button class="btn small ghost" id="tab-ontkoppel" type="button">Tablet ontkoppelen</button>
+    </header>
+    <div id="tab-kies"><div class="namen groot" id="tab-namen"></div></div>
+    <div id="tab-pin" class="pin-box" hidden>
+      <h2 class="h-l" id="tab-pin-titel"></h2>
+      <div class="dots" id="tab-dots" aria-live="polite"></div>
+      <p class="err" id="tab-err" role="alert" hidden></p>
+      <div class="pinpad" id="tab-pad"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Onbekend account ============ -->
+<section class="screen centered" id="scr-onbekend" hidden>
+  <div class="login-box stack">
+    <div class="logo" aria-hidden="true">J</div>
+    <h1 class="h-l">Je bent ingelogd, maar Jarvis kent je nog niet</h1>
+    <p class="muted">Je e-mailadres staat niet (of niet meer) in de medewerkerslijst. Vraag je clubmanager om je toe te voegen via Beheer.</p>
+    <button class="btn" id="onb-uit" type="button">Uitloggen</button>
+  </div>
+</section>
+
+<!-- ============ App ============ -->
+<section class="screen" id="scr-app" hidden>
+  <div class="demo-strip" id="demo-strip" hidden>Demo: gegevens blijven in deze browser. <button type="button" class="btn link small" id="demo-wissel">Andere collega</button></div>
+  <header class="band">
+    <div class="band-l"><span class="mini-logo" aria-hidden="true">J</span><div><b>Jarvis</b><span class="small muted" id="band-loc"></span></div></div>
+    <button class="me" id="me-btn" type="button"><span class="small" id="me-rol"></span><span class="av" id="me-av" aria-hidden="true"></span></button>
+  </header>
+
+  <main id="main" class="wrap app-main">
+    <!-- Jarvis -->
+    <div class="view" data-view="jarvis" hidden>
+      <div class="greet"><h1 class="h-l" id="greet-title"></h1><div class="pills" id="greet-status"></div></div>
+      <p class="note" id="ai-uit" hidden></p>
+      <div class="thread" id="thread" aria-live="polite"></div>
+      <div class="sugg" id="chat-sugg"></div>
+      <form class="chat-form" id="chat-form">
+        <label class="sr" for="chat-in">Vraag Jarvis</label>
+        <textarea id="chat-in" rows="1" maxlength="2000" placeholder="Vraag Jarvis iets of meld een defect"></textarea>
+        <button class="btn primary" id="chat-send" type="submit" aria-label="Versturen">&#x27A4;</button>
+      </form>
+    </div>
+
+    <!-- Checklist -->
+    <div class="view" data-view="checklist" hidden>
+      <div class="card" id="cl-review-card" hidden><h2 class="h-m">Te controleren</h2><div class="list" id="cl-review"></div></div>
+      <h1 class="h-l">Dienstchecklist</h1>
+      <p class="muted small" id="cl-wie"></p>
+      <form id="cl-form" class="stack" novalidate>
+        <div class="card">
+          <div class="row2">
+            <label class="fld"><span>Datum <b class="muted" id="cl-dag"></b></span><input id="cl-datum" type="date" required></label>
+            <fieldset class="seg-radio"><legend>Dienst</legend>
+              <label><input type="radio" name="cl-dienst" value="ochtend"><span>Ochtend</span></label>
+              <label><input type="radio" name="cl-dienst" value="middag"><span>Middag</span></label>
+              <label><input type="radio" name="cl-dienst" value="avond"><span>Avond</span></label>
+            </fieldset>
+          </div>
+        </div>
+        <div id="cl-taken" class="stack"></div>
+        <div class="card">
+          <h3 class="h-m">Ledencontact</h3>
+          <div class="teller">
+            <button class="btn round" type="button" id="cl-min" aria-label="Eén minder">&minus;</button>
+            <output id="cl-leden" aria-live="polite">0</output>
+            <button class="btn round primary" type="button" id="cl-plus" aria-label="Eén erbij">+</button>
+          </div>
+          <p class="small muted center" id="cl-leden-txt"></p>
+        </div>
+        <div class="card">
+          <h3 class="h-m">Defecten</h3>
+          <p class="small muted">Elk defect wordt direct een TD-ticket.</p>
+          <div id="cl-defects" class="stack"></div>
+          <button class="btn small" type="button" id="cl-add-defect">+ Defect toevoegen</button>
+        </div>
+        <div class="card stack">
+          <h3 class="h-m">Incidenten en bijzonderheden</h3>
+          <label class="check"><input type="checkbox" id="cl-geeninc"><span>Geen incidenten deze dienst</span></label>
+          <label class="fld" id="cl-inc-wrap" hidden><span>Wat is er gebeurd?</span><textarea id="cl-inc" rows="3" maxlength="2000"></textarea></label>
+          <label class="fld"><span>Overdracht voor de volgende dienst</span><textarea id="cl-bijz" rows="3" maxlength="2000" placeholder="Bijv. nieuwe leden, klachten, voorraad"></textarea></label>
+        </div>
+        <p class="warn" id="cl-warn" role="alert" hidden></p>
+        <p class="err" id="cl-err" role="alert" hidden></p>
+        <button class="btn primary big" id="cl-submit" type="submit">Checklist inleveren</button>
+      </form>
+      <div class="card spaced"><h2 class="h-m">Recent ingeleverd</h2><div class="list" id="cl-mijn"></div></div>
+    </div>
+
+    <!-- TD -->
+    <div class="view" data-view="td" hidden>
+      <h1 class="h-l">Technische dienst</h1>
+      <form class="card stack" id="td-form" novalidate>
+        <h2 class="h-m">Defect melden</h2>
+        <label class="fld"><span>Apparaat of plek</span><input id="td-code" list="apparaten" autocomplete="off" placeholder="Code of plek, bijv. ALM-F01"></label>
+        <div class="small muted" id="td-naam"></div>
+        <label class="fld"><span>Wat is er mis?</span><textarea id="td-desc" rows="3" maxlength="1000"></textarea></label>
+        <label class="fld"><span>Prioriteit</span>
+          <select id="td-prio"><option value="1">Prio 1, veiligheid: direct</option><option value="2" selected>Prio 2, storing: vandaag</option><option value="3">Prio 3, klein: weekronde</option></select></label>
+        <p class="small muted" id="td-prio-hint"></p>
+        <p class="err" id="td-err" role="alert" hidden></p>
+        <button class="btn primary" id="td-submit" type="submit">Melden bij de TD</button>
+      </form>
+      <div class="seg" id="td-filter" role="tablist">
+        <button type="button" role="tab" data-f="open" aria-selected="true">Open</button>
+        <button type="button" role="tab" data-f="bezig" aria-selected="false">Bezig</button>
+        <button type="button" role="tab" data-f="klaar" aria-selected="false">Klaar</button>
+      </div>
+      <div class="list" id="td-lijst"></div>
+    </div>
+
+    <!-- Uren -->
+    <div class="view" data-view="uren" hidden>
+      <h1 class="h-l">Uren</h1>
+      <div class="seg" id="uren-seg" role="tablist">
+        <button type="button" role="tab" data-sub="overuren" aria-selected="true">Overuren</button>
+        <button type="button" role="tab" data-sub="ruilen" aria-selected="false">Dienst ruilen</button>
+      </div>
+      <div data-subview="overuren">
+        <div class="card" id="ou-beoordelen-card" hidden><h2 class="h-m">Goedkeuren</h2><div class="list" id="ou-beoordelen"></div></div>
+        <form class="card stack" id="ou-form" novalidate>
+          <h2 class="h-m">Overuren schrijven</h2>
+          <label class="fld"><span>Datum</span><input id="ou-datum" type="date"></label>
+          <div class="row3">
+            <label class="fld"><span>Van</span><input id="ou-start" type="time"></label>
+            <label class="fld"><span>Tot</span><input id="ou-eind" type="time"></label>
+            <label class="fld"><span>Pauze (min)</span><input id="ou-pauze" type="number" min="0" max="240" step="5" value="0" inputmode="numeric"></label>
+          </div>
+          <p class="small" id="ou-uren"></p>
+          <label class="fld"><span>Waarom bleef je langer?</span><textarea id="ou-reden" rows="2" maxlength="500"></textarea></label>
+          <p class="err" id="ou-err" role="alert" hidden></p>
+          <button class="btn primary" id="ou-submit" type="submit">Aanvragen</button>
+        </form>
+        <div class="card"><h2 class="h-m">Mijn overuren</h2><p class="small muted" id="ou-totaal"></p><div class="list" id="ou-mijn"></div></div>
+      </div>
+      <div data-subview="ruilen" hidden>
+        <div class="card" id="rv-aan-mij-card" hidden><h2 class="h-m">Vraagt jou om te ruilen</h2><div class="list" id="rv-aan-mij"></div></div>
+        <div class="card" id="rv-beoordelen-card" hidden><h2 class="h-m">Goedkeuren</h2><div class="list" id="rv-beoordelen"></div></div>
+        <form class="card stack" id="rv-form" novalidate>
+          <h2 class="h-m">Dienst ruilen</h2>
+          <p class="small muted">Je collega zegt eerst ja, daarna keurt je leidinggevende het goed.</p>
+          <label class="fld"><span>Met wie?</span><select id="rv-collega"></select></label>
+          <div class="row2">
+            <label class="fld"><span>Datum van jouw dienst</span><input id="rv-datum" type="date"></label>
+            <label class="fld"><span>Dienst</span><select id="rv-dienst"><option value="ochtend">Ochtend</option><option value="middag">Middag</option><option value="avond">Avond</option></select></label>
+          </div>
+          <label class="fld"><span>Toelichting (optioneel)</span><textarea id="rv-reden" rows="2" maxlength="500"></textarea></label>
+          <p class="err" id="rv-err" role="alert" hidden></p>
+          <button class="btn primary" id="rv-submit" type="submit">Verzoek sturen</button>
+        </form>
+        <div class="card"><h2 class="h-m">Mijn ruilverzoeken</h2><div class="list" id="rv-mijn"></div></div>
+      </div>
+    </div>
+
+    <!-- Schema -->
+    <div class="view" data-view="schema" hidden>
+      <h1 class="h-l">Trainingsschema</h1>
+      <p class="muted small">Maak in een minuut een schema voor een lid. Check het altijd zelf voordat je het meegeeft.</p>
+      <form class="card stack" id="sc-form" novalidate>
+        <label class="fld"><span>Voornaam lid</span><input id="sc-naam" maxlength="40" autocomplete="off"></label>
+        <div class="row2">
+          <label class="fld"><span>Doel</span><select id="sc-doel">
+            <option value="fit">Fitter en energieker</option><option value="kracht">Sterker worden</option><option value="afvallen">Afvallen</option>
+            <option value="conditie">Betere conditie</option><option value="vitaal">Vitaal ouder worden</option></select></label>
+          <label class="fld"><span>Niveau</span><select id="sc-niveau"><option value="start">Beginner</option><option value="midden">Gevorderd</option><option value="hoog">Ervaren</option></select></label>
+        </div>
+        <div class="row2">
+          <label class="fld"><span>Dagen per week</span><select id="sc-dagen"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+          <label class="fld"><span>Minuten per keer</span><select id="sc-duur"><option>30</option><option selected>45</option><option>60</option><option>75</option></select></label>
+        </div>
+        <label class="fld"><span>Blessures of beperkingen</span><textarea id="sc-beperk" rows="2" maxlength="500" placeholder="Bijv. knieklachten, hoge bloeddruk"></textarea></label>
+        <p class="err" id="sc-err" role="alert" hidden></p>
+        <button class="btn primary" id="sc-go" type="submit">Maak schema</button>
+      </form>
+      <div class="card schema-uit" id="sc-uit-card" hidden>
+        <div class="md" id="sc-uit"></div>
+        <div class="knoppen"><button class="btn small" type="button" id="sc-print">Printen</button><button class="btn small" type="button" id="sc-kopie">Kopiëren</button></div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="view" data-view="dash" hidden>
+      <h1 class="h-l">Overzicht</h1>
+      <div class="stats" id="dash-stats"></div>
+      <div class="card stack" id="dash-ai-card" hidden>
+        <h2 class="h-m">Weekanalyse door Jarvis</h2>
+        <p class="small muted">Jarvis zet de tickets, checklists en uren van de afgelopen week op een rij en geeft drie actiepunten.</p>
+        <button class="btn" id="dash-ai-go" type="button">Maak weekanalyse</button>
+        <div class="md" id="dash-ai-uit"></div>
+      </div>
+      <div class="card"><h2 class="h-m">Ledencontact per dag</h2><div class="bars" id="dash-leden"></div></div>
+      <div class="card"><h2 class="h-m">Laatste overdrachten</h2><div class="list" id="dash-overdracht"></div></div>
+    </div>
+
+    <!-- Beheer -->
+    <div class="view" data-view="beheer" hidden>
+      <div class="kop-terug"><button class="btn small ghost" type="button" id="bh-terug">&larr; Terug</button><h1 class="h-l">Beheer</h1></div>
+      <div class="card"><div class="kop-knop"><h2 class="h-m">Medewerkers</h2><button class="btn small" id="bh-mw-nieuw" type="button">+ Nieuw</button></div><div class="list" id="bh-mw"></div></div>
+      <div class="card"><div class="kop-knop"><h2 class="h-m">Apparaten en plekken</h2><button class="btn small" id="bh-app-nieuw" type="button">+ Nieuw</button></div>
+        <p class="small muted">Plak een NFC-sticker op een apparaat met de link <code id="bh-nfc-voorbeeld"></code>. Wie hem scant, meldt direct een defect voor dat apparaat.</p>
+        <div class="list" id="bh-app"></div></div>
+    </div>
+  </main>
+
+  <nav class="tabs" aria-label="Hoofdmenu">
+    <button class="tab" type="button" data-tab="jarvis"><span class="ic" aria-hidden="true">&#x2728;</span>Jarvis</button>
+    <button class="tab" type="button" data-tab="checklist"><span class="ic" aria-hidden="true">&#x2714;</span>Checklist<b class="badge" id="b-checklist" hidden></b></button>
+    <button class="tab" type="button" data-tab="td"><span class="ic" aria-hidden="true">&#x1F527;</span>TD<b class="badge alert" id="b-td" hidden></b></button>
+    <button class="tab" type="button" data-tab="uren"><span class="ic" aria-hidden="true">&#x23F1;</span>Uren<b class="badge" id="b-uren" hidden></b></button>
+    <button class="tab" type="button" data-tab="schema"><span class="ic" aria-hidden="true">&#x1F3CB;</span>Schema</button>
+    <button class="tab" type="button" data-tab="dash"><span class="ic" aria-hidden="true">&#x1F4CA;</span>Overzicht</button>
+  </nav>
+</section>
+
+<datalist id="apparaten"></datalist>
+
+<!-- ============ Overlays ============ -->
+<div class="overlay alarm" id="ov-alarm" role="alertdialog" aria-modal="true" aria-labelledby="al-titel" hidden>
+  <div class="sheet">
+    <h2 class="h-l" id="al-titel">Prio 1: veiligheid eerst</h2>
+    <p class="al-what" id="al-what"></p>
+    <ol class="steps" id="al-steps"></ol>
+    <p class="small" id="al-sent"></p>
+    <button class="btn primary big" type="button" id="al-ok">Begrepen</button>
+  </div>
+</div>
+
+<div class="overlay" id="ov-me" role="dialog" aria-modal="true" aria-labelledby="me-titel" hidden>
+  <div class="sheet stack">
+    <div class="kop-knop"><h2 class="h-l" id="me-titel"></h2><button class="btn small ghost" type="button" id="me-sluit" aria-label="Sluiten">&times;</button></div>
+    <p class="muted small" id="me-sub"></p>
+    <fieldset class="seg-radio"><legend>Weergave</legend>
+      <label><input type="radio" name="weergave" value="auto"><span>Automatisch</span></label>
+      <label><input type="radio" name="weergave" value="light"><span>Licht</span></label>
+      <label><input type="radio" name="weergave" value="dark"><span>Donker</span></label>
+    </fieldset>
+    <form class="stack" id="me-pin-form" novalidate>
+      <label class="fld"><span>PIN voor de balie-tablet <small class="muted" id="me-pin-status"></small></span><input id="me-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="4 cijfers"></label>
+      <p class="err" id="me-pin-err" role="alert" hidden></p>
+      <button class="btn small" type="submit">PIN opslaan</button>
+    </form>
+    <button class="btn" type="button" id="me-beheer" hidden>Beheer: medewerkers en apparaten</button>
+    <button class="btn danger" type="button" id="me-uit">Uitloggen</button>
+  </div>
+</div>
+
+<div class="overlay" id="ov-form" role="dialog" aria-modal="true" aria-labelledby="of-titel" hidden>
+  <form class="sheet stack" id="of-form" novalidate>
+    <h2 class="h-l" id="of-titel"></h2>
+    <div class="stack" id="of-body"></div>
+    <p class="err" id="of-err" role="alert" hidden></p>
+    <div class="knoppen"><button class="btn primary" type="submit" id="of-ok">Opslaan</button><button class="btn ghost" type="button" id="of-annuleer">Annuleren</button></div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<noscript><p class="note">Jarvis heeft JavaScript nodig.</p></noscript>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
